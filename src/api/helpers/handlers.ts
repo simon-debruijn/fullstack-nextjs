@@ -1,5 +1,5 @@
 import { NextApiRequest, NextApiResponse } from "next";
-import { HttpError } from "http-errors";
+import { HttpError, InternalServerError, NotFound } from "http-errors";
 
 type Method = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 
@@ -21,13 +21,15 @@ export const getRequestHandler =
   (config: MethodToHandlerConfig) =>
   async (req: NextApiRequest, res: NextApiResponse) => {
     const handler = config[req.method as Method];
-    if (!handler) {
-      throw new Error(
-        `Handler for method ${req.method} on path ${req.url} is undefined`,
-      );
-    }
 
     try {
+      if (!handler) {
+        console.log(
+          `Handler for method ${req.method} on path ${req.url} is undefined`,
+        );
+        throw new NotFound();
+      }
+
       await handler(req, res);
     } catch (error) {
       if (error instanceof HttpError) {
@@ -36,10 +38,13 @@ export const getRequestHandler =
           .send({ name: error.name, message: error.message });
       }
 
-      console.error("HttpError", error);
+      console.error(error);
+
+      const serverError = new InternalServerError();
+
       res.status(500).send({
-        name: "InternalServerError",
-        message: "Internal Server Error",
+        name: serverError.name,
+        message: serverError.message,
       });
     }
   };
